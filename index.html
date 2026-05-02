@@ -162,6 +162,89 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
 .mt2{margin-top:8px}.mt3{margin-top:12px}.mt4{margin-top:16px}
 .mb2{margin-bottom:8px}.mb3{margin-bottom:12px}.mb4{margin-bottom:16px}.mb5{margin-bottom:20px}
 ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:4px}
+
+/* ── MOBILE HAMBURGER BUTTON ── */
+#menu-btn{display:none;align-items:center;justify-content:center;width:36px;height:36px;border-radius:var(--r);border:1.5px solid var(--bd2);background:#fff;cursor:pointer;flex-shrink:0}
+#menu-btn svg{width:18px;height:18px}
+#sb-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.4);z-index:49;backdrop-filter:blur(2px)}
+
+/* ── RESPONSIVE ── */
+@media(max-width:768px){
+
+  /* Login */
+  .lbox{width:92%;padding:28px 22px;border-radius:16px}
+
+  /* Show hamburger, hide sidebar by default */
+  #menu-btn{display:flex}
+  #sb{
+    position:fixed;left:-240px;top:0;height:100vh;z-index:50;
+    transition:left .25s ease;box-shadow:var(--sh-lg)
+  }
+  #sb.open{left:0}
+  #sb-overlay.open{display:block}
+
+  /* Topbar */
+  .topbar{padding:0 14px;gap:10px}
+  .topbar h1{font-size:15px}
+  .tdate{display:none}
+
+  /* Content padding */
+  .ct{padding:14px}
+
+  /* Grids collapse to 1 or 2 cols */
+  .g4{grid-template-columns:1fr 1fr}
+  .g2{grid-template-columns:1fr}
+
+  /* Stat cards smaller */
+  .stat-val{font-size:19px}
+
+  /* POS: stack services + cart vertically */
+  #pg-pos .pos-wrap{
+    grid-template-columns:1fr !important;
+    height:auto !important;
+    gap:14px
+  }
+  #pg-pos .cart-panel{
+    position:fixed;bottom:0;left:0;right:0;
+    height:auto;max-height:50vh;
+    border-radius:var(--rxl) var(--rxl) 0 0;
+    box-shadow:0 -4px 20px rgba(0,0,0,.12);
+    z-index:30;overflow-y:auto
+  }
+  #pg-pos .svc-panel{
+    padding-bottom:340px
+  }
+
+  /* Table: allow horizontal scroll */
+  .tw{border-radius:var(--r)}
+  th,td{padding:8px 10px;font-size:12px}
+
+  /* Modal full-width on mobile */
+  .modal{min-width:unset;width:95%;padding:18px;border-radius:var(--rl)}
+
+  /* Booking filter tabs wrap */
+  #bktabs{flex-wrap:wrap}
+
+  /* Admin tabs wrap */
+  #atmtabs{flex-wrap:wrap}
+
+  /* Charts slightly shorter */
+  .cw{height:170px}
+
+  /* Toast full width */
+  #toasts{left:12px;right:12px;top:12px}
+  .toast{font-size:12px}
+
+  /* Row wraps on small screens */
+  .row.aic.jb{flex-wrap:wrap;gap:8px}
+}
+
+@media(max-width:480px){
+  .g4{grid-template-columns:1fr}
+  .lbox{padding:22px 16px}
+  .stat-val{font-size:17px}
+  .btn{font-size:12px;padding:7px 10px}
+}
 </style>
 </head>
 <body>
@@ -187,6 +270,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
 
 <!-- APP -->
 <div id="app">
+  <div id="sb-overlay" onclick="closeSb()"></div>
   <div id="sb">
     <div class="sb-top">
       <div class="sb-mark"><svg viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg></div>
@@ -211,7 +295,15 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
   </div>
 
   <div id="main">
-    <div class="topbar"><h1 id="ptitle">Dashboard</h1><div class="row aic" style="gap:10px"><span class="tdate" id="tdt"></span></div></div>
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:10px">
+        <button id="menu-btn" onclick="toggleSb()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <h1 id="ptitle">Dashboard</h1>
+      </div>
+      <div class="row aic" style="gap:10px"><span class="tdate" id="tdt"></span></div>
+    </div>
     <div class="ct">
 
       <!-- DASHBOARD -->
@@ -229,13 +321,13 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
 
       <!-- POS -->
       <div class="pg" id="pg-pos">
-        <div style="display:grid;grid-template-columns:1fr 340px;gap:20px;height:calc(100vh - 104px)">
-          <div style="overflow-y:auto">
+        <div class="pos-wrap" style="display:grid;grid-template-columns:1fr 340px;gap:20px;height:calc(100vh - 104px)">
+          <div class="svc-panel" style="overflow-y:auto">
             <div class="row aic jb mb3"><strong style="font-size:15px">Services</strong><input type="text" id="sq" placeholder="Search..." style="width:180px" oninput="rsvcs()"></div>
             <div class="ctab" id="ctabs"></div>
             <div class="sg" id="sgrid"></div>
           </div>
-          <div class="card" style="display:flex;flex-direction:column;overflow:hidden">
+          <div class="card cart-panel" style="display:flex;flex-direction:column;overflow:hidden">
             <div class="sec" style="margin-bottom:10px">🛒 Cart</div>
             <div id="clist" style="flex:1;overflow-y:auto;min-height:0"></div>
             <div style="flex-shrink:0">
@@ -468,6 +560,7 @@ function gp(id,e2){
   el('pg-'+id).classList.add('on');
   if(e2)e2.classList.add('on');
   el('ptitle').textContent=PTITLES[id];
+  closeSb();
   try{({dashboard:rdash,pos:rpos,bookings:rbks,expenses:rexp,reports:rrpts,transactions:rtxns,admin:radm})[id]();}catch(e){console.error(e);}
 }
 
@@ -778,6 +871,16 @@ function sbr(){
   S.brs.push({id:S.brs.length+1,name:n,addr:a});closeModal();toast('Added','ok');radm();
 }
 function dbr(id){S.brs=S.brs.filter(b=>b.id!==id);toast('Deleted','ok');radm();}
+
+// ── MOBILE SIDEBAR ───────────────────────────────────────
+function toggleSb(){
+  document.getElementById('sb').classList.toggle('open');
+  document.getElementById('sb-overlay').classList.toggle('open');
+}
+function closeSb(){
+  document.getElementById('sb').classList.remove('open');
+  document.getElementById('sb-overlay').classList.remove('open');
+}
 
 // ── CHART DEFAULTS ───────────────────────────────────────
 if(typeof Chart!=='undefined'){
