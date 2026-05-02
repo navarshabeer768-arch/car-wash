@@ -163,6 +163,9 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
 .mb2{margin-bottom:8px}.mb3{margin-bottom:12px}.mb4{margin-bottom:16px}.mb5{margin-bottom:20px}
 ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:4px}
 
+#cart-toggle{display:none}
+#cart-inner{padding:0}
+
 /* ── MOBILE HAMBURGER BUTTON ── */
 #menu-btn{display:none;align-items:center;justify-content:center;width:36px;height:36px;border-radius:var(--r);border:1.5px solid var(--bd2);background:#fff;cursor:pointer;flex-shrink:0}
 #menu-btn svg{width:18px;height:18px}
@@ -198,22 +201,44 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
   /* Stat cards smaller */
   .stat-val{font-size:19px}
 
-  /* POS: stack services + cart vertically */
+  #cart-toggle{display:flex}
+  #cart-inner{padding:0 16px 16px}
+  /* hide desktop cart title text since toggle bar replaces it */
+  #pg-pos .sec{display:none}
   #pg-pos .pos-wrap{
     grid-template-columns:1fr !important;
     height:auto !important;
-    gap:14px
+    gap:0
+  }
+  #pg-pos .svc-panel{
+    padding-bottom:72px
   }
   #pg-pos .cart-panel{
     position:fixed;bottom:0;left:0;right:0;
-    height:auto;max-height:50vh;
     border-radius:var(--rxl) var(--rxl) 0 0;
-    box-shadow:0 -4px 20px rgba(0,0,0,.12);
-    z-index:30;overflow-y:auto
+    box-shadow:0 -4px 24px rgba(0,0,0,.15);
+    z-index:30;
+    transition:max-height .3s ease;
+    max-height:56px;
+    overflow:hidden;
+    background:#fff
   }
-  #pg-pos .svc-panel{
-    padding-bottom:340px
+  #pg-pos .cart-panel.expanded{
+    max-height:85vh;
+    overflow-y:auto
   }
+  #cart-toggle{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 16px;cursor:pointer;border-bottom:1px solid var(--bd);
+    flex-shrink:0;user-select:none
+  }
+  #cart-toggle-left{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px}
+  #cart-badge{background:var(--accent);color:#fff;border-radius:20px;padding:1px 8px;font-size:11px;font-weight:700}
+  #cart-toggle-right{display:flex;align-items:center;gap:10px}
+  #cart-toggle-total{font-weight:700;color:var(--accent);font-size:14px}
+  #cart-arrow{font-size:18px;color:var(--text3);transition:transform .3s}
+  #pg-pos .cart-panel.expanded #cart-arrow{transform:rotate(180deg)}
+  #cart-inner{padding:0 16px 16px}
 
   /* Table: allow horizontal scroll */
   .tw{border-radius:var(--r)}
@@ -328,7 +353,11 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
             <div class="sg" id="sgrid"></div>
           </div>
           <div class="card cart-panel" style="display:flex;flex-direction:column;overflow:hidden">
-            <div class="sec" style="margin-bottom:10px">🛒 Cart</div>
+            <div id="cart-toggle" onclick="toggleCart()">
+              <div id="cart-toggle-left">🛒 Cart <span id="cart-badge">0</span></div>
+              <div id="cart-toggle-right"><span id="cart-toggle-total">QAR 0.00</span><span id="cart-arrow">⌃</span></div>
+            </div>
+            <div id="cart-inner">
             <div id="clist" style="flex:1;overflow-y:auto;min-height:0"></div>
             <div style="flex-shrink:0">
               <div class="hr"></div>
@@ -348,9 +377,10 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
               <div class="row jb mb4" style="font-size:18px;font-weight:700"><span>Total</span><span id="dtot" style="color:var(--accent)">QAR 0.00</span></div>
               <button class="btn bp wfull" onclick="checkout()" style="justify-content:center;padding:11px;font-size:14px">✓ Checkout</button>
             </div>
-          </div>
-        </div>
-      </div>
+            </div><!-- /cart-inner -->
+          </div><!-- /cart-panel -->
+        </div><!-- /pos-wrap -->
+      </div><!-- /pg-pos -->
 
       <!-- BOOKINGS -->
       <div class="pg" id="pg-bookings">
@@ -608,9 +638,9 @@ function rfc(id){S.cart=S.cart.filter(x=>x.id!==id);rcart();rsvcs();}
 function cqty(id,d){const i=S.cart.find(x=>x.id===id);if(!i)return;i.qty+=d;if(i.qty<=0)rfc(id);else rcart();}
 function rcart(){
   const e=el('clist');if(!e)return;
-  if(!S.cart.length){e.innerHTML='<p style="color:var(--text3);text-align:center;padding:30px 0;font-size:13px">Cart is empty</p>';ct();return;}
+  if(!S.cart.length){e.innerHTML='<p style="color:var(--text3);text-align:center;padding:30px 0;font-size:13px">Cart is empty</p>';ct();updateCartBar();return;}
   e.innerHTML=S.cart.map(i=>`<div class="ci"><div><div style="font-size:13px;font-weight:600">${i.name}</div><div style="font-size:11px;color:var(--text3)">QAR ${i.price} ea.</div></div><div style="display:flex;align-items:center;gap:5px"><div class="qb" onclick="cqty(${i.id},-1)">−</div><span style="font-size:13px;min-width:16px;text-align:center">${i.qty}</span><div class="qb" onclick="cqty(${i.id},1)">+</div><span style="font-size:13px;font-weight:600;color:var(--accent);min-width:54px;text-align:right">QAR ${i.price*i.qty}</span><div class="qb" style="color:var(--err)" onclick="rfc(${i.id})">×</div></div></div>`).join('');
-  ct();
+  ct();updateCartBar();
 }
 function ct(){
   const sub=S.cart.reduce((a,i)=>a+(i.price*i.qty),0);
@@ -880,6 +910,20 @@ function toggleSb(){
 function closeSb(){
   document.getElementById('sb').classList.remove('open');
   document.getElementById('sb-overlay').classList.remove('open');
+}
+function toggleCart(){
+  document.querySelector('.cart-panel')?.classList.toggle('expanded');
+}
+function updateCartBar(){
+  const count=S.cart.reduce((a,i)=>a+i.qty,0);
+  const tot=S.cart.reduce((a,i)=>a+(i.price*i.qty),0);
+  const badge=el('cart-badge'),totEl=el('cart-toggle-total');
+  if(badge) badge.textContent=count;
+  if(totEl) totEl.textContent='QAR '+f2(tot);
+  // auto-open cart when item added on mobile
+  if(count>0&&window.innerWidth<=768){
+    document.querySelector('.cart-panel')?.classList.add('expanded');
+  }
 }
 
 // ── CHART DEFAULTS ───────────────────────────────────────
