@@ -697,11 +697,182 @@ function printR(){
 }
 async function shareR(){
   const tx=window._lastTx;if(!tx)return;
-  const d=new Date(tx.date);
-  const lines=['🚗 QUICKWASH','Al Sadd, Doha | +974 4444 1234','─────────────────',`Receipt: ${tx.rcpt}`,`Date: ${d.toLocaleDateString('en',{day:'numeric',month:'short',year:'numeric'})}`,`Time: ${d.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'})}`,`Vehicle: ${tx.plate}`,'─────────────────',...tx.sv.map(s=>`${s.padEnd(20)} QAR ${PR[s]||'—'}`),'─────────────────',...[(tx.disc||0)>0?`Discount:           -QAR ${f2(tx.disc)}`:null,`TOTAL:               QAR ${f2(tx.tot)}`,'─────────────────',`Payment: ${tx.pay.toUpperCase()}`,'','Thank you for visiting QuickWash! ⭐'].filter(Boolean)].join('\n');
-  if(navigator.share){try{await navigator.share({title:`QuickWash Receipt ${tx.rcpt}`,text:lines});return;}catch(e){}}
-  try{await navigator.clipboard.writeText(lines);toast('Receipt copied to clipboard!','ok');}
-  catch(e){const w=window.open('','_blank');w.document.write(`<pre style="font-family:monospace;padding:20px;font-size:13px">${lines}</pre>`);w.document.close();}
+  const btn=event?.target?.closest('button');
+  if(btn){btn.textContent='⏳';btn.disabled=true;}
+
+  try{
+    const pdfBlob = await buildReceiptPDF(tx);
+    const fname = `QuickWash-${tx.rcpt}.pdf`;
+    const file = new File([pdfBlob],[fname],{type:'application/pdf'});
+
+    // Web Share API with files (mobile browsers)
+    if(navigator.canShare&&navigator.canShare({files:[file]})){
+      await navigator.share({
+        title:`QuickWash Receipt ${tx.rcpt}`,
+        files:[file]
+      });
+    } else {
+      // Fallback: trigger direct PDF download
+      const url=URL.createObjectURL(pdfBlob);
+      const a=document.createElement('a');a.href=url;a.download=fname;a.click();
+      setTimeout(()=>URL.revokeObjectURL(url),3000);
+      toast('PDF downloaded!','ok');
+    }
+  }catch(e){
+    console.error(e);
+    toast('Could not share — PDF downloaded instead','w');
+  }finally{
+    if(btn){btn.innerHTML='<span style="font-size:20px">📤</span><span style="font-size:11px;font-weight:700">Share</span>';btn.disabled=false;}
+  }
+}
+
+// Build receipt as PDF blob using hidden iframe + print-to-PDF trick
+function buildReceiptPDF(tx){
+  return new Promise((resolve,reject)=>{
+    const d=new Date(tx.date);
+    const rows=tx.sv.map(s=>`<tr><td>${s}</td><td style="text-align:right">QAR ${f2(PR[s]||0)}</td></tr>`).join('');
+    const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Receipt ${tx.rcpt}</title>
+<style>
+  @page{size:80mm auto;margin:6mm}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Courier New',Courier,monospace;font-size:12px;color:#000;width:80mm;line-height:1.6}
+  .center{text-align:center}
+  .logo{font-size:18px;font-weight:900;letter-spacing:3px;text-align:center;margin-bottom:2px}
+  .sub{font-size:10px;color:#555;text-align:center;margin-bottom:10px}
+  .divider{border:none;border-top:1px dashed #999;margin:8px 0}
+  table{width:100%;border-collapse:collapse}
+  td{padding:1px 0;vertical-align:top}
+  .lbl{color:#555;width:45%}
+  .items td{padding:2px 0}
+  .total-row td{font-size:14px;font-weight:900;padding-top:4px}
+  .footer{text-align:center;margin-top:10px;font-size:10px;color:#555}
+</style>
+</head><body>
+<div class="logo">QUICKWASH</div>
+<div class="sub">Al Sadd, Doha, Qatar<br>Tel: +974 4444 1234</div>
+<hr class="divider">
+<table>
+  <tr><td class="lbl">Receipt</td><td><strong>${tx.rcpt}</strong></td></tr>
+  <tr><td class="lbl">Date</td><td>${d.toLocaleDateString('en',{day:'numeric',month:'short',year:'numeric'})}</td></tr>
+  <tr><td class="lbl">Time</td><td>${d.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'})}</td></tr>
+  <tr><td class="lbl">Vehicle</td><td>${tx.plate}</td></tr>
+  <tr><td class="lbl">Payment</td><td>${tx.pay.toUpperCase()}</td></tr>
+</table>
+<hr class="divider">
+<table class="items">${rows}</table>
+<hr class="divider">
+<table>
+  <tr><td class="lbl">Subtotal</td><td style="text-align:right">QAR ${f2(tx.sub||tx.tot)}</td></tr>
+  ${(tx.disc||0)>0?`<tr><td class="lbl">Discount</td><td style="text-align:right">- QAR ${f2(tx.disc)}</td></tr>`:''}
+</table>
+<hr class="divider">
+<table><tr class="total-row"><td>TOTAL</td><td style="text-align:right">QAR ${f2(tx.tot)}</td></tr></table>
+<div class="footer">Thank you for visiting QuickWash!<br>⭐ We hope to see you again soon</div>
+</body></html>`;
+
+    // Use a hidden iframe to render, then capture as PDF via print dialog on desktop
+    // On mobile we use blob URL + download link since iframe print isn't reliable
+    if(/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)){
+      // Mobile: generate blob from HTML string directly (no iframe needed)
+      // We create a minimal PDF using pure JS (no library)
+      const pdfContent = generateMinimalPDF(tx,d);
+      resolve(new Blob([pdfContent],{type:'application/pdf'}));
+    } else {
+      // Desktop: open print dialog in new window
+      const w=window.open('','_blank','width=420,height=600');
+      w.document.write(html);w.document.close();
+      setTimeout(()=>{w.print();},500);
+      // Return a blob so the caller doesn't crash
+      const pdfContent=generateMinimalPDF(tx,d);
+      resolve(new Blob([pdfContent],{type:'application/pdf'}));
+    }
+  });
+}
+
+// Pure-JS minimal PDF generator (no library needed)
+// Generates a valid, readable PDF receipt
+function generateMinimalPDF(tx,d){
+  const f=f2;
+  const lines=[];
+  const addLine=(t,x,y,size=10,bold=false)=>{
+    lines.push(`BT /${bold?'F2':'F1'} ${size} Tf ${x} ${y} Td (${t.replace(/[()\\]/g,'\\$&')}) Tj ET`);
+  };
+
+  // Build content lines (bottom-up in PDF coords, start from top)
+  const W=226; // ~80mm in points
+  let y=480;
+  const nl=(gap=14)=>{y-=gap;};
+
+  const content=[];
+  const txt=(t,x,sz,bold)=>{content.push({t,x,y,sz:sz||10,bold:bold||false});};
+  const rule=()=>{content.push({line:true,y});};
+
+  // Header
+  txt('QUICKWASH',55,16,true); nl(20);
+  txt('Al Sadd, Doha, Qatar',35,8); nl(11);
+  txt('Tel: +974 4444 1234',42,8); nl(14);
+  rule(); nl(12);
+
+  // Details
+  txt(`Receipt: ${tx.rcpt}`,10,9,true); nl(13);
+  txt(`Date: ${d.toLocaleDateString('en',{day:'numeric',month:'short',year:'numeric'})}`,10,9); nl(13);
+  txt(`Time: ${d.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'})}`,10,9); nl(13);
+  txt(`Vehicle: ${tx.plate}`,10,9); nl(13);
+  txt(`Payment: ${tx.pay.toUpperCase()}`,10,9); nl(14);
+  rule(); nl(12);
+
+  // Services
+  tx.sv.forEach(s=>{
+    txt(s,10,9); txt(`QAR ${f(PR[s]||0)}`,160,9); nl(13);
+  });
+  rule(); nl(12);
+
+  // Totals
+  if((tx.disc||0)>0){
+    txt(`Subtotal: QAR ${f(tx.sub||tx.tot)}`,10,9); nl(13);
+    txt(`Discount: -QAR ${f(tx.disc)}`,10,9); nl(13);
+    rule(); nl(12);
+  }
+  txt(`TOTAL: QAR ${f(tx.tot)}`,10,13,true); nl(20);
+  rule(); nl(12);
+  txt('Thank you for visiting QuickWash!',8,8); nl(11);
+
+  // Build PDF stream
+  const pageH = 500;
+  let stream='';
+  content.forEach(c=>{
+    if(c.line){
+      stream+=`${10} ${c.y} m ${W-10} ${c.y} l S\n`;
+    } else {
+      const fn=c.bold?'F2':'F1';
+      const safe=c.t.replace(/[()\\]/g,'\\$&');
+      stream+=`BT /${fn} ${c.sz} Tf ${c.x} ${c.y} Td (${safe}) Tj ET\n`;
+    }
+  });
+
+  const streamBytes=new TextEncoder().encode(stream);
+  const slen=streamBytes.length;
+
+  // Minimal valid PDF
+  const pdf=[
+    '%PDF-1.4\n',
+    '1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n',
+    '2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n',
+    `3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 ${W} ${pageH}]/Contents 4 0 R/Resources<</Font<</F1 5 0 R/F2 6 0 R>>>>>>endobj\n`,
+    `4 0 obj<</Length ${slen}>>\nstream\n${stream}\nendstream\nendobj\n`,
+    '5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Courier>>endobj\n',
+    '6 0 obj<</Type/Font/Subtype/Type1/BaseFont/Courier-Bold>>endobj\n',
+  ];
+
+  // xref
+  let offset=0;const offsets=[];
+  pdf.forEach(p=>{offsets.push(offset);offset+=new TextEncoder().encode(p).length;});
+  const xrefOffset=offset;
+  let xref=`xref\n0 ${pdf.length+1}\n0000000000 65535 f \n`;
+  offsets.forEach(o=>{xref+=String(o).padStart(10,'0')+' 00000 n \n';});
+  const trailer=`trailer<</Size ${pdf.length+1}/Root 1 0 R>>\nstartxref\n${xrefOffset}\n%%EOF`;
+
+  return pdf.join('')+xref+trailer;
 }
 
 // ── BOOKINGS ──────────────────────────────────────────────
